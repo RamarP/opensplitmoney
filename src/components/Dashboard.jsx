@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTrips } from '../context/TripContext';
 import { 
@@ -20,7 +20,7 @@ export default function Dashboard() {
   const { trips, loading, createTrip, joinTrip } = useTrips();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [selectedTripId, setSelectedTripId] = useState(null);
   const [newTripName, setNewTripName] = useState('');
   const [newTripDescription, setNewTripDescription] = useState('');
   const [inviteCode, setInviteCode] = useState('');
@@ -29,6 +29,9 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
+
+  // Get the selected trip from the trips array (always fresh data)
+  const selectedTrip = trips.find(t => t.id === selectedTripId);
 
   async function handleCreateTrip(e) {
     e.preventDefault();
@@ -80,8 +83,13 @@ export default function Dashboard() {
     setError('');
   }
 
-  if (selectedTrip) {
-    return <TripDetail trip={selectedTrip} onBack={() => setSelectedTrip(null)} />;
+  if (selectedTripId && selectedTrip) {
+    return <TripDetail trip={selectedTrip} onBack={() => setSelectedTripId(null)} />;
+  }
+
+  // If trip was deleted or user left, reset selection
+  if (selectedTripId && !selectedTrip) {
+    setSelectedTripId(null);
   }
 
   return (
@@ -171,7 +179,7 @@ export default function Dashboard() {
               {trips.map((trip, index) => (
                 <button
                   key={trip.id}
-                  onClick={() => setSelectedTrip(trip)}
+                  onClick={() => setSelectedTripId(trip.id)}
                   className={`w-full bg-white hover:bg-surface-50 border border-surface-200 rounded-2xl p-5 text-left transition-all duration-200 hover:shadow-lg hover:scale-[1.01] animate-fade-in`}
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
@@ -363,4 +371,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

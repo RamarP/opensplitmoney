@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTrips } from '../context/TripContext';
 import {
@@ -16,7 +16,10 @@ import {
   ArrowRight,
   DollarSign,
   Calendar,
-  Tag
+  Tag,
+  User,
+  Users2,
+  Percent
 } from 'lucide-react';
 
 export default function TripDetail({ trip, onBack }) {
@@ -34,8 +37,18 @@ export default function TripDetail({ trip, onBack }) {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [paidBy, setPaidBy] = useState(user.uid);
-  const [splitBetween, setSplitBetween] = useState(trip.memberIds || []);
+  const [splitType, setSplitType] = useState('equal'); // 'equal', 'custom'
+  const [splitBetween, setSplitBetween] = useState([]);
   const [category, setCategory] = useState('general');
+
+  // Initialize splitBetween when modal opens
+  useEffect(() => {
+    if (showAddExpense) {
+      setSplitBetween(trip.memberIds || []);
+      setPaidBy(user.uid);
+      setSplitType('equal');
+    }
+  }, [showAddExpense, trip.memberIds, user.uid]);
 
   const { balances, settlements } = calculateBalances(trip);
   const isCreator = trip.createdBy === user.uid;
@@ -57,6 +70,7 @@ export default function TripDetail({ trip, onBack }) {
 
   function getMemberName(uid) {
     const member = trip.members?.find(m => m.uid === uid);
+    if (member?.uid === user.uid) return 'You';
     return member?.displayName || member?.email?.split('@')[0] || 'Unknown';
   }
 
@@ -72,6 +86,16 @@ export default function TripDetail({ trip, onBack }) {
       }
     } else {
       setSplitBetween([...splitBetween, uid]);
+    }
+  }
+
+  // Quick split options
+  function setQuickSplit(type) {
+    setSplitType('equal');
+    if (type === 'all') {
+      setSplitBetween(trip.memberIds || []);
+    } else if (type === 'just-me') {
+      setSplitBetween([user.uid]);
     }
   }
 
@@ -95,6 +119,7 @@ export default function TripDetail({ trip, onBack }) {
       setPaidBy(user.uid);
       setSplitBetween(trip.memberIds || []);
       setCategory('general');
+      setSplitType('equal');
     } else {
       setError(result.error);
     }
@@ -277,7 +302,7 @@ export default function TripDetail({ trip, onBack }) {
                         <div>
                           <p className="font-semibold text-surface-800">{expense.description}</p>
                           <p className="text-sm text-surface-500">
-                            {getMemberName(expense.paidBy)} paid
+                            <span className="font-medium text-surface-700">{getMemberName(expense.paidBy)}</span> paid
                             {expense.splitBetween && expense.splitBetween.length !== trip.memberIds.length && (
                               <span> • Split between {expense.splitBetween.length}</span>
                             )}
@@ -378,7 +403,7 @@ export default function TripDetail({ trip, onBack }) {
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-surface-500">
-                          {getMemberName(settlement.from)} pays {getMemberName(settlement.to)}
+                          <span className="font-medium text-surface-700">{getMemberName(settlement.from)}</span> pays <span className="font-medium text-surface-700">{getMemberName(settlement.to)}</span>
                         </p>
                         <p className="font-bold text-surface-800">₹{settlement.amount.toFixed(2)}</p>
                       </div>
@@ -473,7 +498,7 @@ export default function TripDetail({ trip, onBack }) {
                   Amount (₹)
                 </label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-500 font-medium">₹</span>
                   <input
                     type="number"
                     value={amount}
@@ -482,7 +507,7 @@ export default function TripDetail({ trip, onBack }) {
                     required
                     min="0.01"
                     step="0.01"
-                    className="w-full pl-11 pr-4 py-3 border-2 border-surface-200 rounded-xl focus:outline-none focus:border-primary-500 transition-colors"
+                    className="w-full pl-10 pr-4 py-3 border-2 border-surface-200 rounded-xl focus:outline-none focus:border-primary-500 transition-colors"
                   />
                 </div>
               </div>
@@ -510,28 +535,73 @@ export default function TripDetail({ trip, onBack }) {
                 </div>
               </div>
 
+              {/* Paid By Section */}
               <div>
                 <label className="block text-sm font-medium text-surface-700 mb-1.5">
                   Paid by
                 </label>
-                <select
-                  value={paidBy}
-                  onChange={(e) => setPaidBy(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-surface-200 rounded-xl focus:outline-none focus:border-primary-500 transition-colors appearance-none bg-white"
-                >
+                <div className="grid grid-cols-2 gap-2">
                   {trip.members?.map(member => (
-                    <option key={member.uid} value={member.uid}>
-                      {member.displayName || member.email?.split('@')[0]}
-                      {member.uid === user.uid ? ' (You)' : ''}
-                    </option>
+                    <button
+                      key={member.uid}
+                      type="button"
+                      onClick={() => setPaidBy(member.uid)}
+                      className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                        paidBy === member.uid
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-surface-200 hover:border-surface-300'
+                      }`}
+                    >
+                      {member.photoURL ? (
+                        <img src={member.photoURL} alt="" className="w-6 h-6 rounded-full" />
+                      ) : (
+                        <div className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center font-semibold text-xs">
+                          {member.displayName?.[0] || member.email?.[0] || '?'}
+                        </div>
+                      )}
+                      <span className="text-sm font-medium text-surface-700 truncate">
+                        {member.uid === user.uid ? 'You' : (member.displayName || member.email?.split('@')[0])}
+                      </span>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
 
+              {/* Split Options */}
               <div>
                 <label className="block text-sm font-medium text-surface-700 mb-1.5">
-                  Split between
+                  Split
                 </label>
+                
+                {/* Quick Options */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setQuickSplit('all')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${
+                      splitBetween.length === trip.memberIds?.length
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-surface-200 text-surface-600 hover:border-surface-300'
+                    }`}
+                  >
+                    <Users2 className="w-4 h-4" />
+                    <span className="text-sm font-medium">Split Equally</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickSplit('just-me')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${
+                      splitBetween.length === 1 && splitBetween[0] === user.uid
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-surface-200 text-surface-600 hover:border-surface-300'
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                    <span className="text-sm font-medium">Just Me</span>
+                  </button>
+                </div>
+
+                {/* Member Selection */}
                 <div className="space-y-2">
                   {trip.members?.map(member => (
                     <button
@@ -552,9 +622,13 @@ export default function TripDetail({ trip, onBack }) {
                         </div>
                       )}
                       <span className="flex-1 text-left text-surface-700">
-                        {member.displayName || member.email?.split('@')[0]}
-                        {member.uid === user.uid && <span className="text-primary-500"> (You)</span>}
+                        {member.uid === user.uid ? 'You' : (member.displayName || member.email?.split('@')[0])}
                       </span>
+                      {splitBetween.includes(member.uid) && amount && (
+                        <span className="text-sm font-medium text-primary-600">
+                          ₹{(parseFloat(amount) / splitBetween.length).toFixed(2)}
+                        </span>
+                      )}
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                         splitBetween.includes(member.uid)
                           ? 'border-primary-500 bg-primary-500'
@@ -567,9 +641,10 @@ export default function TripDetail({ trip, onBack }) {
                     </button>
                   ))}
                 </div>
+                
                 {splitBetween.length > 0 && amount && (
-                  <p className="text-sm text-surface-500 mt-2">
-                    ₹{(parseFloat(amount) / splitBetween.length).toFixed(2)} per person
+                  <p className="text-sm text-surface-500 mt-2 text-center">
+                    ₹{(parseFloat(amount) / splitBetween.length).toFixed(2)} per person × {splitBetween.length} people
                   </p>
                 )}
               </div>
@@ -604,4 +679,3 @@ export default function TripDetail({ trip, onBack }) {
     </div>
   );
 }
-
